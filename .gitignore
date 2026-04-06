@@ -10,7 +10,6 @@ dependency-reduced-pom.xml
 .mtj.tmp
 
 # Package Files #
-*.jar
 *.war
 *.ear
 
@@ -18,7 +17,8 @@ dependency-reduced-pom.xml
 hs_err_pid*
 
 bin
-target
+target/**
+!target/*.jar
 logs
 project
 .project
