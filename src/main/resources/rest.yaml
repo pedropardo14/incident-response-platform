@@ -1,0 +1,84 @@
+#
+# IRIS - Incident Response Intelligence System
+# REST Automation Configuration
+#
+rest:
+  # ── Webhook: GitHub Actions failure ──────────────────────────────────────
+  - service: "http.flow.adapter"
+    methods: ['POST']
+    url: "/webhook/github"
+    flow: 'incident-triggered'
+    timeout: 30s
+    cors: cors_1
+    headers: header_1
+    tracing: true
+
+  # ── Demo: Simulate a failure (no real GitHub needed) ─────────────────────
+  - service: "http.flow.adapter"
+    methods: ['POST']
+    url: "/api/simulate/failure"
+    flow: 'simulate-failure'
+    timeout: 30s
+    cors: cors_1
+    headers: header_1
+    tracing: true
+
+  # ── Incidents: List all ───────────────────────────────────────────────────
+  - service: "http.flow.adapter"
+    methods: ['GET']
+    url: "/api/incidents"
+    flow: 'list-incidents'
+    timeout: 10s
+    cors: cors_1
+    headers: header_1
+    tracing: true
+
+  # ── Incidents: Get by ID ──────────────────────────────────────────────────
+  - service: "http.flow.adapter"
+    methods: ['GET']
+    url: "/api/incidents/{incident_id}"
+    flow: 'get-incident'
+    timeout: 10s
+    cors: cors_1
+    headers: header_1
+    tracing: true
+
+  # ── Incidents: Resolve ────────────────────────────────────────────────────
+  - service: "http.flow.adapter"
+    methods: ['POST']
+    url: "/api/incidents/{incident_id}/resolve"
+    flow: 'resolve-incident'
+    timeout: 15s
+    cors: cors_1
+    headers: header_1
+    tracing: true
+
+#
+# CORS
+#
+cors:
+  - id: cors_1
+    origin: ${api.origin}
+    options:
+      - "Access-Control-Allow-Origin: *"
+      - "Access-Control-Allow-Methods: GET, POST, OPTIONS"
+      - "Access-Control-Allow-Headers: Origin, Authorization, X-Trace-Id, X-Correlation-Id, Accept, Content-Type"
+      - "Access-Control-Max-Age: 86400"
+    headers:
+      - "Access-Control-Allow-Origin: *"
+      - "Access-Control-Allow-Methods: GET, POST, OPTIONS"
+      - "Access-Control-Allow-Headers: Origin, Authorization, X-Trace-Id, X-Correlation-Id, Accept, Content-Type"
+      - "Access-Control-Allow-Credentials: true"
+
+#
+# Request/response header rules
+#
+headers:
+  - id: header_1
+    request:
+      drop: ['Upgrade-Insecure-Requests', 'cache-control', 'accept-encoding', 'connection']
+    response:
+      add:
+        - "Strict-Transport-Security: max-age=31536000"
+        - "Cache-Control: no-cache, no-store"
+        - "Pragma: no-cache"

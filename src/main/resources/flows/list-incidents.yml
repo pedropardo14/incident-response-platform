@@ -1,0 +1,29 @@
+flow:
+  id: 'list-incidents'
+  description: 'Returns all incidents, optionally filtered by status query param.'
+  ttl: 10s
+  exception: 'v1.iris.exception'
+
+first.task: 'v1.incident.list'
+
+tasks:
+
+  - input:
+      - 'input.query.status -> header.status_filter'
+    process: 'v1.incident.list'
+    output:
+      - 'result          -> output.body'
+      - 'int(200)        -> output.status'
+    description: 'Fetch incidents from Postgres'
+    execution: end
+
+  - input:
+      - 'error.code    -> status'
+      - 'error.message -> message'
+      - 'error.stack   -> stack'
+    process: 'v1.iris.exception'
+    output:
+      - 'result.status -> output.status'
+      - 'result        -> output.body'
+    description: 'Handle flow errors'
+    execution: end

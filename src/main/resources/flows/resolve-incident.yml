@@ -1,0 +1,55 @@
+flow:
+  id: 'resolve-incident'
+  description: >
+    Marks an incident as resolved in Postgres, updates the Notion page status
+    to Resolved, and posts a resolution notification to Teams.
+  ttl: 15s
+  exception: 'v1.iris.exception'
+
+first.task: 'v1.incident.resolve'
+
+tasks:
+
+  # ── Step 1: Mark resolved in Postgres ────────────────────────────────────
+  - input:
+      - 'input.path_parameter.incident_id -> header.incident_id'
+    process: 'v1.incident.resolve'
+    output:
+      - 'result -> model.resolved_incident'
+    description: 'Mark incident as resolved and fetch updated record'
+    execution: sequential
+    next:
+      - 'v1.notion.update.status'
+
+  # ── Step 2: Update Notion page status to Resolved ─────────────────────────
+  - input:
+      - 'model.resolved_incident -> *'
+    process: 'v1.notion.update.status'
+    output:
+      - 'result.notion_updated -> model.notion_updated'
+    description: 'Patch Notion page Status property to Resolved'
+    execution: sequential
+    next:
+      - 'v1.teams.notify.resolved'
+
+  # ── Step 3: Notify Teams and return response ──────────────────────────────
+  - input:
+      - 'model.resolved_incident -> *'
+    process: 'v1.teams.notify.resolved'
+    output:
+      - 'model.resolved_incident -> output.body'
+      - 'int(200) -> output.status'
+    description: 'Post resolution notification to Teams and return resolved incident'
+    execution: end
+
+  # ── Exception handler ─────────────────────────────────────────────────────
+  - input:
+      - 'error.code    -> status'
+      - 'error.message -> message'
+      - 'error.stack   -> stack'
+    process: 'v1.iris.exception'
+    output:
+      - 'result.status -> output.status'
+      - 'result        -> output.body'
+    description: 'Handle flow errors'
+    execution: end

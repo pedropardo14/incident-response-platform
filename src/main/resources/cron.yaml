@@ -1,0 +1,10 @@
+#
+# Mini-scheduler configuration for IRIS
+# Runs a health check every 5 minutes to confirm DB connectivity
+# and log open incident count.
+#
+jobs:
+  - id: 'iris-health-check'
+    route: 'iris.health'
+    description: 'Periodic health check — confirms DB is up and logs open incidents'
+    schedule: '0 */5 * * * *'

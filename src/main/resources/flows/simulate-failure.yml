@@ -1,0 +1,153 @@
+flow:
+  id: 'simulate-failure'
+  description: >
+    Demo flow: generates a synthetic GitHub Actions failure webhook and runs
+    the full incident pipeline sequentially. Returns the created incident
+    immediately via execution=response, then continues notifying Teams and
+    Notion asynchronously in the background.
+  ttl: 30s
+  exception: 'v1.iris.exception'
+
+first.task: 'v1.simulate.failure'
+
+tasks:
+
+  # ── Step 1: Generate fake webhook payload ────────────────────────────────
+  - input:
+      - 'input.body -> *'
+    process: 'v1.simulate.failure'
+    output:
+      - 'result -> model.fake_payload'
+    description: 'Generate a realistic GitHub Actions failure webhook payload'
+    execution: sequential
+    next:
+      - 'v1.github.parse.webhook'
+
+  # ── Step 2: Parse the simulated payload ──────────────────────────────────
+  - input:
+      - 'model.fake_payload -> *'
+    process: 'v1.github.parse.webhook'
+    output:
+      - 'result.workflow_name -> model.workflow_name'
+      - 'result.repository    -> model.repository'
+      - 'result.branch        -> model.branch'
+      - 'result.conclusion    -> model.conclusion'
+      - 'result.workflow_url  -> model.workflow_url'
+      - 'result.head_sha      -> model.head_sha'
+    description: 'Parse the simulated webhook'
+    execution: sequential
+    next:
+      - 'v1.metrics.fetch'
+
+  # ── Step 3: Fetch service metrics ────────────────────────────────────────
+  - input:
+      - 'text(fetch) -> action'
+    process: 'v1.metrics.fetch'
+    output:
+      - 'result -> model.metrics'
+    description: 'Fetch service error metrics from Postgres'
+    execution: sequential
+    next:
+      - 'v1.github.fetch.commits'
+
+  # ── Step 4: Fetch recent commits ─────────────────────────────────────────
+  - input:
+      - 'model.repository -> header.repository'
+      - 'model.head_sha   -> header.sha'
+    process: 'v1.github.fetch.commits'
+    output:
+      - 'result -> model.recent_commits'
+    description: 'Fetch recent commits (demo data)'
+    execution: sequential
+    next:
+      - 'v1.severity.assess'
+
+  # ── Step 5: Assess severity ───────────────────────────────────────────────
+  - input:
+      - 'model.metrics    -> *'
+      - 'model.conclusion -> header.conclusion'
+      - 'model.branch     -> header.branch'
+    process: 'v1.severity.assess'
+    output:
+      - 'result.severity -> model.severity'
+      - 'result.reason   -> model.severity_reason'
+    description: 'Assess incident severity'
+    execution: sequential
+    next:
+      - 'v1.incident.store'
+
+  # ── Step 6: Store incident, return HTTP response immediately ──────────────
+  - input:
+      - 'model.workflow_name -> header.workflow_name'
+      - 'model.repository    -> header.repository'
+      - 'model.branch        -> header.branch'
+      - 'model.conclusion    -> header.conclusion'
+      - 'model.severity      -> header.severity'
+    process: 'v1.incident.store'
+    output:
+      - 'result.incident_id -> model.incident_id'
+      - 'result.title       -> model.incident_title'
+      - 'int(201) -> output.status'
+      - 'result   -> output.body'
+    description: 'Persist incident and return response to caller immediately'
+    execution: response
+    next:
+      - 'v1.teams.notify'
+
+  # ── Step 7: Notify Teams (async) ──────────────────────────────────────────
+  - input:
+      - 'model.metrics       -> *'
+      - 'model.incident_id   -> header.incident_id'
+      - 'model.severity      -> header.severity'
+      - 'model.workflow_name -> header.workflow_name'
+      - 'model.repository    -> header.repository'
+      - 'model.branch        -> header.branch'
+      - 'model.conclusion    -> header.conclusion'
+      - 'model.workflow_url  -> header.workflow_url'
+    process: 'v1.teams.notify'
+    output:
+      - 'result.teams_notified -> model.teams_notified'
+    description: 'Post incident alert to Teams (async)'
+    execution: sequential
+    next:
+      - 'v1.notion.create.page'
+
+  # ── Step 8: Create Notion page (async) ────────────────────────────────────
+  - input:
+      - 'model.recent_commits -> *'
+      - 'model.incident_id    -> header.incident_id'
+      - 'model.severity       -> header.severity'
+      - 'model.workflow_name  -> header.workflow_name'
+      - 'model.repository     -> header.repository'
+      - 'model.branch         -> header.branch'
+      - 'model.conclusion     -> header.conclusion'
+      - 'model.workflow_url   -> header.workflow_url'
+    process: 'v1.notion.create.page'
+    output:
+      - 'result.notion_page_url -> model.notion_page_url'
+    description: 'Create Notion incident doc (async)'
+    execution: sequential
+    next:
+      - 'v1.incident.update'
+
+  # ── Step 9: Update incident record (async) ────────────────────────────────
+  - input:
+      - 'model.incident_id     -> header.incident_id'
+      - 'model.notion_page_url -> header.notion_page_url'
+      - 'model.teams_notified  -> header.teams_notified'
+    process: 'v1.incident.update'
+    output: []
+    description: 'Update incident with Notion URL and Teams status'
+    execution: end
+
+  # ── Exception handler ─────────────────────────────────────────────────────
+  - input:
+      - 'error.code    -> status'
+      - 'error.message -> message'
+      - 'error.stack   -> stack'
+    process: 'v1.iris.exception'
+    output:
+      - 'result.status -> output.status'
+      - 'result        -> output.body'
+    description: 'Handle flow errors'
+    execution: end

@@ -1,0 +1,29 @@
+flow:
+  id: 'get-incident'
+  description: 'Returns a single incident by ID from the URL path.'
+  ttl: 10s
+  exception: 'v1.iris.exception'
+
+first.task: 'v1.incident.get'
+
+tasks:
+
+  - input:
+      - 'input.path_parameter.incident_id -> header.incident_id'
+    process: 'v1.incident.get'
+    output:
+      - 'result   -> output.body'
+      - 'int(200) -> output.status'
+    description: 'Fetch incident by ID from Postgres'
+    execution: end
+
+  - input:
+      - 'error.code    -> status'
+      - 'error.message -> message'
+      - 'error.stack   -> stack'
+    process: 'v1.iris.exception'
+    output:
+      - 'result.status -> output.status'
+      - 'result        -> output.body'
+    description: 'Handle flow errors'
+    execution: end
