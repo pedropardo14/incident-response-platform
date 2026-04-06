@@ -9,7 +9,7 @@ IRIS is a self-hosted incident response platform built on [Mercury Composable](h
 - **Automatic incident detection** — GitHub Actions webhook triggers the full pipeline on workflow failure
 - **Parallel triage** — commits and service metrics are fetched simultaneously using Mercury's fork-n-join execution
 - **Severity assessment** — classifies incidents as `critical`, `high`, `medium`, or `low` based on branch, failure type, and error rates
-- **Microsoft Teams alerts** — posts a rich card to your channel on incident creation and resolution
+- **Microsoft Teams alerts** — posts a rich card to your channel on incident creation and resolution *NOT ADDED - Implimintation is there*
 - **Notion incident docs** — creates a structured report page with commits, metrics, and resolution notes, and updates it when resolved
 - **Live dashboard** — single-page UI with real-time incident list, stats, simulate and resolve buttons
 - **Simulate mode** — trigger a realistic fake incident without needing a real GitHub failure
